@@ -13,8 +13,9 @@ if (admin.apps.length === 0) {
   admin.initializeApp(functions.config().firebase);
 }
 
+// 毎日
 exports.scheduledFunctionCrontab = functions.pubsub
-  .schedule("0 7 * * *")
+  .schedule("0 7 * * 1-5")
   .timeZone("Asia/Tokyo")
   .onRun(async () => {
     await createSuddenMeeting();
