@@ -150,14 +150,12 @@ export const createSuddenMeeting = async () => {
             items,
             timeMax:
               dayjs()
-                .date(7)
                 .hour(18)
                 .minute(0)
                 .second(0)
                 .format("YYYY-MM-DDTHH:mm:ss") + "+09:00",
             timeMin:
               dayjs()
-                .date(7)
                 .hour(11)
                 .minute(0)
                 .second(0)
@@ -251,7 +249,6 @@ export const createSuddenMeeting = async () => {
       ];
 
       const targetDate = dayjs()
-        .date(7)
         .hour(time[targetTime].hour)
         .minute(time[targetTime].minute);
 
@@ -298,7 +295,7 @@ export const createSuddenMeeting = async () => {
       postMessage(
         "```\n＿人人人人人人人＿\n＞　突然の会議　＜\n￣Y^Y^Y^Y^Y^Y￣\n```\n" +
           `${targetUser
-            .map((mail) => `<${mailUserIdMap[mail]}> さん`)
+            .map((mail) => `<@${mailUserIdMap[mail]}> さん`)
             .join("、")}\n\n突然ですが本日${targetDate.format(
             "HH:mm"
           )}から雑談しませんか！？\n\n` +
