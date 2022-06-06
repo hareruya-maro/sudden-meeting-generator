@@ -21,14 +21,9 @@
     "dayjs": "^1.11.2",
     "firebase-admin": "^10.0.2",
     "firebase-functions": "^3.18.0",
-    "googleapis": "^100.0.0",
-    "jsonwebtoken": "^8.5.1",
-    "request": "^2.88.2",
-    "request-promise": "^4.2.6"
+    "googleapis": "^100.0.0"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^8.5.8",
-    "@types/request-promise": "^4.1.48",
     "@typescript-eslint/eslint-plugin": "^5.12.0",
     "@typescript-eslint/parser": "^5.12.0",
     "eslint": "^8.9.0",
