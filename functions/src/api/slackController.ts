@@ -62,9 +62,9 @@ if (!process.env.FUNCTION_NAME || process.env.FUNCTION_NAME === "slack-event") {
       try {
         functions.logger.info(request.body, { structuredData: true });
         const { challenge, type, team_id, event_id, event } = request.body;
-        console.log(challenge, type, team_id, event_id);
 
         if (type === "url_verification") {
+          // SlackのイベントURL検証用
           response.send({ challenge });
           return;
         } else if (type === "event_callback") {

@@ -11,6 +11,7 @@ import {
 } from "../const";
 import { storeOAuthInfo } from "./firestoreService";
 
+// メッセージを送信する
 export const postMessage = async (
   text: string,
   channel: string,
@@ -49,7 +50,7 @@ export const getCalendarLinkUrl = async (
     CALENDAR_REDIRECT_URI
   );
 
-  // カレンダーの読み取りとイベントの書き込みを許可する
+  // カレンダーの読み取りを許可する
   const scopes = ["https://www.googleapis.com/auth/calendar.readonly"];
 
   const authorizationUrl = oauth2Client.generateAuthUrl({
@@ -73,7 +74,7 @@ export const getZoomLinkUrl = async (
   return `https://zoom.us/oauth/authorize?response_type=code&client_id=${ZOOM_CLIENT_ID}&redirect_uri=${ZOOM_REDIRECT_URI}&state=${state}`;
 };
 
-const linkToGoogle = async (
+const linkToGoogleAndZoom = async (
   teamId: string,
   channelId: string,
   threadTs: string
@@ -88,6 +89,7 @@ const linkToGoogle = async (
   );
 };
 
+// メンションイベントの反応
 export const appMention = async (event: {
   team: string;
   channel: string;
@@ -97,8 +99,6 @@ export const appMention = async (event: {
 
   const { team, channel, ts } = event;
 
-  functions.logger.info(team, channel, ts);
-
-  // Google Calendarとの連携用URLを返す
-  await linkToGoogle(team, channel, ts);
+  // Google CalendarとZoomとのOAuth連携用URLを返す
+  await linkToGoogleAndZoom(team, channel, ts);
 };

@@ -22,6 +22,7 @@ exports.scheduledFunctionCrontab = functions.pubsub
     return null;
   });
 
+// テスト用にHTTPリクエストでも実行可能にする
 exports.suddenMeeting = functions
   .region(REGION)
   .https.onRequest(async (req, res) => {
@@ -30,21 +31,6 @@ exports.suddenMeeting = functions
     res.send("create meeting");
   });
 
-if (
-  !process.env.FUNCTION_NAME ||
-  process.env.FUNCTION_NAME.startsWith("slack")
-) {
-  exports.slack = require("./api/slackController");
-}
-if (
-  !process.env.FUNCTION_NAME ||
-  process.env.FUNCTION_NAME.startsWith("calendar")
-) {
-  exports.calendar = require("./api/calendarController");
-}
-if (
-  !process.env.FUNCTION_NAME ||
-  process.env.FUNCTION_NAME.startsWith("zoom")
-) {
-  exports.zoom = require("./api/zoomController");
-}
+exports.slack = require("./api/slackController");
+exports.calendar = require("./api/calendarController");
+exports.zoom = require("./api/zoomController");

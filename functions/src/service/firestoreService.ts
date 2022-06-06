@@ -43,6 +43,8 @@ export const getZoomCredentials = async (teamId: string) => {
   return zoomCredentials;
 };
 
+// すでに受信したイベントかどうかをチェックする
+// （メンションは何回かリトライされる場合があるため）
 export const checkEvent = async (
   teamId: string,
   eventId: string,

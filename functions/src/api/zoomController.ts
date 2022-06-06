@@ -64,7 +64,6 @@ if (
           headers,
         });
 
-        console.log(codeResponse.data);
         const { teamId } = oauthInfo;
         const { access_token, expires_in, refresh_token, scope, token_type } =
           codeResponse.data;

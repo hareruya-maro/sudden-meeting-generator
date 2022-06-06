@@ -290,8 +290,6 @@ export const createSuddenMeeting = async () => {
         { headers: { Authorization: `Bearer ${zoomToken}` } }
       );
 
-      console.log(createMeetingResult.data);
-
       postMessage(
         "```\n＿人人人人人人人＿\n＞　突然の会議　＜\n￣Y^Y^Y^Y^Y^Y￣\n```\n" +
           `${targetUser
