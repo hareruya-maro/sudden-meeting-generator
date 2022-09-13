@@ -10,6 +10,7 @@ import {
   ZOOM_REDIRECT_URI,
 } from "../const";
 import { storeOAuthInfo } from "./firestoreService";
+import { createSuddenMeeting } from "./zoomService";
 
 // メッセージを送信する
 export const postMessage = async (
@@ -94,11 +95,17 @@ export const appMention = async (event: {
   team: string;
   channel: string;
   ts: string;
+  text: string;
 }) => {
   functions.logger.info(event, { structuredData: true });
 
-  const { team, channel, ts } = event;
+  const { team, channel, ts, text } = event;
 
-  // Google CalendarとZoomとのOAuth連携用URLを返す
-  await linkToGoogleAndZoom(team, channel, ts);
+  if (text.includes("create")) {
+    // 会議を作成する
+    await createSuddenMeeting();
+  } else {
+    // Google CalendarとZoomとのOAuth連携用URLを返す
+    await linkToGoogleAndZoom(team, channel, ts);
+  }
 };
