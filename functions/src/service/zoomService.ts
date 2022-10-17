@@ -1,4 +1,5 @@
 /* eslint-disable camelcase */
+import { CloudTasksClient, protos } from "@google-cloud/tasks";
 import { WebClient } from "@slack/web-api";
 import axios from "axios";
 import * as admin from "firebase-admin";
@@ -17,6 +18,7 @@ import {
 import { getCalendarCredentials, setTeamInfo } from "./firestoreService";
 import { postMessage } from "./slackService";
 import dayjs = require("dayjs");
+
 if (admin.apps.length === 0) {
   admin.initializeApp(functions.config().firebase);
 }
@@ -300,6 +302,62 @@ export const createSuddenMeeting = async () => {
           `時間になったら<${createMeetingResult.data.join_url}|こちらのURL>から参加してください！！\n`,
         SLACK_TARGET_CHANNEL
       );
+
+      // Instantiates a client.
+      const client = new CloudTasksClient();
+
+      const project = "sudden-meeting-generator";
+      const queue = "sudden-meeting-reminder";
+      const location = "us-central1";
+      const url = "https://slack.com/api/chat.postMessage";
+      const payload = {
+        channel: SLACK_TARGET_CHANNEL,
+        text:
+          `${targetUser
+            .map((mail) => `<@${mailUserIdMap[mail]}> さん`)
+            .join("、")}\n\nもうすぐ雑談の時間（${targetDate.format(
+            "HH:mm"
+          )}）になります！\n\n` +
+          `時間になったら<${createMeetingResult.data.join_url}|こちらのURL>から参加してください！！\n`,
+      };
+
+      const parent = client.queuePath(project, location, queue);
+
+      const task: protos.google.cloud.tasks.v2.ITask = {
+        httpRequest: {
+          headers: {
+            "Content-Type": "text/plain",
+            Authorization: "Bearer " + SLACK_BOT_TOKEN,
+          },
+          httpMethod: "POST",
+          url,
+        },
+      };
+
+      if (payload && task.httpRequest) {
+        task.httpRequest.body = Buffer.from(JSON.stringify(payload)).toString(
+          "base64"
+        );
+      }
+
+      // ５分前に通知
+      const diffSeconds = targetDate.diff(dayjs(), "seconds") - 60 * 5;
+
+      task.scheduleTime = {
+        seconds: diffSeconds + Date.now() / 1000,
+      };
+
+      const request: protos.google.cloud.tasks.v2.ICreateTaskRequest = {
+        parent: parent,
+        task: task,
+      };
+
+      console.log("Sending task:");
+      console.log(task);
+      // Send create task request.
+      const [response] = await client.createTask(request);
+      const name = response.name;
+      console.log(`Created task ${name}`);
     })
   );
 };
