@@ -326,7 +326,7 @@ export const createSuddenMeeting = async () => {
       const task: protos.google.cloud.tasks.v2.ITask = {
         httpRequest: {
           headers: {
-            "Content-Type": "text/plain",
+            "Content-Type": "application/json",
             Authorization: "Bearer " + SLACK_BOT_TOKEN,
           },
           httpMethod: "POST",
