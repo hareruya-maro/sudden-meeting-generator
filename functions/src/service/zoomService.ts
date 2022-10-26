@@ -340,8 +340,9 @@ export const createSuddenMeeting = async () => {
         );
       }
 
-      // ５分前に通知
-      const diffSeconds = targetDate.diff(dayjs(), "seconds") - 60 * 5;
+      // ５分前に通知＆GMTからJSTに補正
+      const diffSeconds =
+        targetDate.diff(dayjs(), "seconds") - 60 * 5 - 60 * 60 * 9;
 
       task.scheduleTime = {
         seconds: diffSeconds + Date.now() / 1000,
