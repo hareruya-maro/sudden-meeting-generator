@@ -16,7 +16,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@slack/web-api": "^6.7.1",
+    "@slack/web-api": "^6.7.2",
     "axios": "^0.27.2",
     "dayjs": "^1.11.2",
     "firebase-admin": "^10.0.2",
