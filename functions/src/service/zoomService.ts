@@ -158,7 +158,7 @@ export const createSuddenMeeting = async () => {
                 .format("YYYY-MM-DDTHH:mm:ss") + "+09:00",
             timeMin:
               dayjs()
-                .hour(11)
+                .hour(15)
                 .minute(0)
                 .second(0)
                 .format("YYYY-MM-DDTHH:mm:ss") + "+09:00",
@@ -171,14 +171,14 @@ export const createSuddenMeeting = async () => {
         const start = dayjs(dateItem.start);
         const end = dayjs(dateItem.end);
 
-        // 空き時間を求めるために対象としたい時間帯
-        const clockInTime = start.clone().hour(2).minute(0);
+        // 空き時間を求めるために対象としたい時間帯(15時以降（UTC6時以降）)
+        const clockInTime = start.clone().hour(6).minute(0);
 
         // ビット処理するために必要な時間帯
         const dateBit: boolean[] = [];
 
         let checkDuration = clockInTime;
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < 6; i++) {
           // 予定がある稼働かを設定
           dateBit.push(
             (start.isBefore(checkDuration) || start.isSame(checkDuration)) &&
@@ -214,7 +214,7 @@ export const createSuddenMeeting = async () => {
         );
       }
 
-      const targetTime = Math.floor(Math.random() * 14);
+      const targetTime = Math.floor(Math.random() * 6);
 
       const shuffle = ([...array]) => {
         for (let i = array.length - 1; i >= 0; i--) {
@@ -234,14 +234,6 @@ export const createSuddenMeeting = async () => {
       });
 
       const time = [
-        { hour: 11, minute: 0 },
-        { hour: 11, minute: 30 },
-        { hour: 12, minute: 0 },
-        { hour: 12, minute: 30 },
-        { hour: 13, minute: 0 },
-        { hour: 13, minute: 30 },
-        { hour: 14, minute: 0 },
-        { hour: 14, minute: 30 },
         { hour: 15, minute: 0 },
         { hour: 15, minute: 30 },
         { hour: 16, minute: 0 },
