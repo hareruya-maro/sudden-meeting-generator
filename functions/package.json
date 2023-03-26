@@ -16,6 +16,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@google-cloud/tasks": "^3.0.4",
     "@slack/web-api": "^6.8.0",
     "axios": "^0.27.2",
     "dayjs": "^1.11.7",
