@@ -1,7 +1,6 @@
 /* eslint-disable camelcase */
 import { CloudTasksClient, protos } from "@google-cloud/tasks";
 import { WebClient } from "@slack/web-api";
-import axios from "axios";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import { calendar_v3 as calendarV3, google } from "googleapis";
@@ -11,9 +10,6 @@ import {
   CALENDAR_REDIRECT_URI,
   SLACK_BOT_TOKEN,
   SLACK_TARGET_CHANNEL,
-  ZOOM_API,
-  ZOOM_CLIENT_ID,
-  ZOOM_CLIENT_SECRET,
 } from "../const";
 import { getCalendarCredentials, setTeamInfo } from "./firestoreService";
 import { postMessage } from "./slackService";
@@ -29,7 +25,6 @@ const firestore = admin.firestore();
  * 認可コードを用いてアクセストークンを取得する
  * @param {string} code string 認可コード
  * @param {string} teamId チームID
- * @param {string} userId ユーザーID
  * @return {Promise<string>} アクセストークン
  */
 export const getGoogleAccessTokenByCode = async (
@@ -59,55 +54,6 @@ export const getExpireAt = (expiresIn: number): Date => {
   const expireAt = new Date();
   expireAt.setSeconds(expireAt.getSeconds() + expiresIn);
   return expireAt;
-};
-
-export const getAccessTokenByRefreshToken = async (
-  refreshToken: string,
-  teamId: string
-): Promise<string> => {
-  const params = new URLSearchParams();
-  params.append("grant_type", "refresh_token");
-  params.append("client_id", ZOOM_CLIENT_ID);
-  params.append("client_secret", ZOOM_CLIENT_SECRET);
-  params.append("refresh_token", refreshToken);
-
-  const headers = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  };
-
-  const res = await axios.post(ZOOM_API.TOKEN, params, { headers });
-  functions.logger.info(res.data, { structuredData: true });
-  const { access_token, refresh_token, expires_in } = res.data;
-
-  await setTeamInfo(teamId, {
-    zoomCredentials: {
-      access_token,
-      refresh_token,
-      expires_at: getExpireAt(expires_in),
-    },
-  });
-
-  return access_token as string;
-};
-
-export const getZoomToken = async (teamId: string) => {
-  const teamRef = firestore.collection("teams").doc(teamId);
-
-  const teamDoc = await teamRef.get();
-
-  const { expires_at, access_token, refresh_token } =
-    teamDoc.data()?.zoomCredentials || {};
-
-  // 期限切れの場合はrefreshTokenを使ってtokenを再取得
-  if (expires_at && expires_at.toDate().getTime() < Date.now()) {
-    const accessToken = await getAccessTokenByRefreshToken(
-      refresh_token,
-      teamId
-    );
-    return accessToken;
-  }
-
-  return access_token;
 };
 
 export const createSuddenMeeting = async () => {
@@ -246,44 +192,6 @@ export const createSuddenMeeting = async () => {
         .hour(time[targetTime].hour)
         .minute(time[targetTime].minute);
 
-      const zoomToken = await getZoomToken(team.id);
-
-      const createMeetingBody = {
-        topic: "",
-        type: "2",
-        start_time: targetDate.toISOString(),
-        duration: 30,
-        timezone: "Asia/Tokyo",
-        password: "",
-        agenda: "",
-        settings: {
-          host_video: false,
-          Alternative_hosts: targetUser.join(","),
-          participant_video: false,
-          cn_meeting: false,
-          in_meeting: false,
-          join_before_host: true,
-          mute_upon_entry: false,
-          watermark: false,
-          use_pmi: false,
-          waiting_room: false,
-          approval_type: "0",
-          registration_type: "1",
-          audio: "both",
-          enforce_login: false,
-          enforce_login_domains: "",
-          alternative_hosts: "",
-          global_dial_in_countries: [""],
-          registrants_email_notification: false,
-        },
-      };
-
-      const createMeetingResult = await axios.post(
-        ZOOM_API.USERS_ME_MEETINGS,
-        createMeetingBody,
-        { headers: { Authorization: `Bearer ${zoomToken}` } }
-      );
-
       postMessage(
         "```\n＿人人人人人人人＿\n＞　突然の会議　＜\n￣Y^Y^Y^Y^Y^Y￣\n```\n" +
           `${targetUser
@@ -291,7 +199,7 @@ export const createSuddenMeeting = async () => {
             .join("、")}\n\n突然ですが本日${targetDate.format(
             "HH:mm"
           )}から雑談しませんか！？\n\n` +
-          `時間になったら<${createMeetingResult.data.join_url}|こちらのURL>から参加してください！！\n`,
+          "時間になったらこのチャンネルのハドルに参加してください！！\n",
         SLACK_TARGET_CHANNEL
       );
 
@@ -310,7 +218,7 @@ export const createSuddenMeeting = async () => {
             .join("、")}\n\nもうすぐ雑談の時間（${targetDate.format(
             "HH:mm"
           )}）になります！\n\n` +
-          `時間になったら<${createMeetingResult.data.join_url}|こちらのURL>から参加してください！！\n`,
+          "時間になったらこのチャンネルのハドルに参加してください！！\n",
       };
 
       const parent = client.queuePath(project, location, queue);
