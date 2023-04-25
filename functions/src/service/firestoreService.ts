@@ -33,16 +33,6 @@ export const getCalendarCredentials = async (teamId: string) => {
 
   return calendarCredentials;
 };
-export const getZoomCredentials = async (teamId: string) => {
-  const teamRef = firestore.collection("teams").doc(teamId);
-
-  const teamDoc = await teamRef.get();
-
-  const { zoomCredentials } = teamDoc.data() || {};
-
-  return zoomCredentials;
-};
-
 // すでに受信したイベントかどうかをチェックする
 // （メンションは何回かリトライされる場合があるため）
 export const checkEvent = async (

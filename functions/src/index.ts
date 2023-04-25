@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import { REGION } from "./const";
-import { createSuddenMeeting } from "./service/zoomService";
+import { createSuddenMeeting } from "./service/meetingService";
 import dayjs = require("dayjs");
 import timezone = require("dayjs/plugin/timezone");
 import utc = require("dayjs/plugin/utc");
@@ -33,4 +33,3 @@ exports.suddenMeeting = functions
 
 exports.slack = require("./api/slackController");
 exports.calendar = require("./api/calendarController");
-exports.zoom = require("./api/zoomController");
