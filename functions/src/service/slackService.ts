@@ -6,11 +6,9 @@ import {
   CALENDAR_CLIENT_SECRET,
   CALENDAR_REDIRECT_URI,
   SLACK_BOT_TOKEN,
-  ZOOM_CLIENT_ID,
-  ZOOM_REDIRECT_URI,
 } from "../const";
 import { storeOAuthInfo } from "./firestoreService";
-import { createSuddenMeeting } from "./zoomService";
+import { createSuddenMeeting } from "./meetingService";
 
 // メッセージを送信する
 export const postMessage = async (
@@ -64,27 +62,15 @@ export const getCalendarLinkUrl = async (
   return `${authorizationUrl}&state=${state}`;
 };
 
-export const getZoomLinkUrl = async (
-  teamId: string,
-  channelId: string,
-  threadTs: string
-) => {
-  // OAuth用に情報を保存する
-  const state = await storeOAuthInfo(teamId, channelId, threadTs);
-
-  return `https://zoom.us/oauth/authorize?response_type=code&client_id=${ZOOM_CLIENT_ID}&redirect_uri=${ZOOM_REDIRECT_URI}&state=${state}`;
-};
-
-const linkToGoogleAndZoom = async (
+const linkToGoogle = async (
   teamId: string,
   channelId: string,
   threadTs: string
 ) => {
   const calendarLinkUrl = await getCalendarLinkUrl(teamId, channelId, threadTs);
-  const zoomLinkUrl = await getZoomLinkUrl(teamId, channelId, threadTs);
   // OAuth用のURLを返す
   postMessage(
-    `Google Calendar / ZoomとSlackを連携します。\n<${calendarLinkUrl}|こちらのリンク（Google Calendar）>と<${zoomLinkUrl}|こちらのリンク（Zoom）>をクリックして連携用ページを開いてください。`,
+    `Google CalendarとSlackを連携します。\n<${calendarLinkUrl}|こちらのリンク（Google Calendar）>をクリックして連携用ページを開いてください。`,
     channelId,
     threadTs
   );
@@ -105,7 +91,7 @@ export const appMention = async (event: {
     // 会議を作成する
     await createSuddenMeeting();
   } else {
-    // Google CalendarとZoomとのOAuth連携用URLを返す
-    await linkToGoogleAndZoom(team, channel, ts);
+    // Google CalendarとのOAuth連携用URLを返す
+    await linkToGoogle(team, channel, ts);
   }
 };
