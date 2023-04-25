@@ -25,7 +25,6 @@ const firestore = admin.firestore();
  * 認可コードを用いてアクセストークンを取得する
  * @param {string} code string 認可コード
  * @param {string} teamId チームID
- * @param {string} userId ユーザーID
  * @return {Promise<string>} アクセストークン
  */
 export const getGoogleAccessTokenByCode = async (
