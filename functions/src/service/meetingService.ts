@@ -61,13 +61,19 @@ export const createSuddenMeeting = async (channel?: string) => {
       }
       const web = new WebClient(SLACK_BOT_TOKEN);
 
-      const members = await web.conversations.members({
-        channel: SLACK_TARGET_CHANNEL,
+      const membersResponse = await web.conversations.members({
+        channel: channel ?? SLACK_TARGET_CHANNEL,
       });
 
-      if (!members.members) {
+      if (!membersResponse.members) {
         return;
       }
+
+      const users = await web.users.list({});
+
+      const members = membersResponse.members.filter(
+        (member) => !users.members?.find((user) => user.id === member)?.is_bot
+      );
 
       const shuffle = (array: string[]) => {
         const newArray = array.slice();
@@ -90,11 +96,12 @@ export const createSuddenMeeting = async (channel?: string) => {
           (member) => !existingMembers.includes(member)
         );
         if (newMembers.length > 0) {
-          const minNonZeroCount = Math.min(
-            ...existingMembers
-              .map((member) => selectionCounts[member])
-              .filter((count) => count > 0)
-          );
+          const minNonZeroCount =
+            existingMembers.length > 0
+              ? Math.min(
+                  ...existingMembers.map((member) => selectionCounts[member])
+                )
+              : 0;
           newMembers.forEach((member) => {
             selectionCounts[member] = minNonZeroCount;
           });
@@ -121,6 +128,7 @@ export const createSuddenMeeting = async (channel?: string) => {
       // メンバーを選択する関数
       const selectMembers = async (members: string[]): Promise<string[]> => {
         const selectionCounts = await getMemberSelectionCounts(members);
+        console.log(selectionCounts);
         const sortedMembers = members.sort((a, b) => {
           return (selectionCounts[a] || 0) - (selectionCounts[b] || 0);
         });
@@ -156,11 +164,11 @@ export const createSuddenMeeting = async (channel?: string) => {
       };
 
       // メンバーを選択する処理を追加
-      const targetUser = await selectMembers(members.members);
+      const targetUser = await selectMembers(members);
       console.log("Selected Members:", targetUser);
 
       team.data().members = team.data().members || { members: [] };
-      members.members.sort(() => Math.random() - 0.5);
+      members.sort(() => Math.random() - 0.5);
 
       // 15時固定
       const targetDate = dayjs().hour(15).minute(0).second(0).millisecond(0);
@@ -171,7 +179,7 @@ export const createSuddenMeeting = async (channel?: string) => {
             .map((user) => `<@${user}> さん`)
             .join("、")}\n\n突然ですが本日15時から雑談しませんか！？\n\n` +
           "時間になったらこのチャンネルのハドルに参加してください！！\n",
-        SLACK_TARGET_CHANNEL
+        channel ?? SLACK_TARGET_CHANNEL
       );
 
       // Instantiates a client.
@@ -182,7 +190,7 @@ export const createSuddenMeeting = async (channel?: string) => {
       const location = "us-central1";
       const url = "https://slack.com/api/chat.postMessage";
       const payload = {
-        channel: SLACK_TARGET_CHANNEL,
+        channel: channel ?? SLACK_TARGET_CHANNEL,
         text:
           `${targetUser
             .map((user) => `<@${user}> さん`)
