@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 /* eslint-disable camelcase */
 import axios from "axios";
-import * as functions from "firebase-functions";
+import { logger } from "firebase-functions";
+import { onRequest } from "firebase-functions/v2/https";
 import { REGION, SLACK_API, SLACK_REDIRECT_URI } from "../const";
 import { checkEvent, setTeamInfo } from "../service/firestoreService";
 import { appMention } from "../service/slackService";
@@ -13,13 +14,9 @@ if (
   !process.env.FUNCTION_NAME ||
   process.env.FUNCTION_NAME === "slack-callback"
 ) {
-  exports.callback = functions
-    .runWith({
-      timeoutSeconds: 60,
-      memory: "256MB",
-    })
-    .region(REGION)
-    .https.onRequest(async (request, response) => {
+  exports.callback = onRequest(
+    { region: REGION, timeoutSeconds: 60, memory: "256MiB" },
+    async (request, response) => {
       const { code } = request.query;
 
       if (code) {
@@ -47,20 +44,17 @@ if (
         setTeamInfo(team.id, { slackBotToken: access_token });
       }
       response.send("連携に成功しました。画面を閉じてSlackを開いてください。");
-    });
+    }
+  );
 }
 
 if (!process.env.FUNCTION_NAME || process.env.FUNCTION_NAME === "slack-event") {
   // Event Subscriptionsの受信
-  exports.event = functions
-    .runWith({
-      timeoutSeconds: 300,
-      memory: "1GB",
-    })
-    .region(REGION)
-    .https.onRequest(async (request, response) => {
+  exports.event = onRequest(
+    { memory: "1GiB", timeoutSeconds: 300, region: REGION },
+    async (request, response) => {
       try {
-        functions.logger.info(request.body, { structuredData: true });
+        logger.info(request.body, { structuredData: true });
         const { challenge, type, team_id, event_id, event } = request.body;
 
         if (type === "url_verification") {
@@ -75,9 +69,10 @@ if (!process.env.FUNCTION_NAME || process.env.FUNCTION_NAME === "slack-event") {
         response.send("ok");
         return;
       } catch (e) {
-        functions.logger.error(e, { structuredData: true });
+        logger.error(e, { structuredData: true });
       }
       response.send("ok");
       return;
-    });
+    }
+  );
 }

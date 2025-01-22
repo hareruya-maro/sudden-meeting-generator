@@ -1,9 +1,8 @@
 /* eslint-disable camelcase */
 import { CloudTasksClient, protos } from "@google-cloud/tasks";
 import { WebClient } from "@slack/web-api";
-import * as admin from "firebase-admin";
-import * as functions from "firebase-functions";
-import { calendar_v3 as calendarV3, google } from "googleapis";
+import { logger } from "firebase-functions";
+import { google } from "googleapis";
 import {
   CALENDAR_CLIENT_ID,
   CALENDAR_CLIENT_SECRET,
@@ -11,16 +10,13 @@ import {
   SLACK_BOT_TOKEN,
   SLACK_TARGET_CHANNEL,
 } from "../const";
-import { getCalendarCredentials, setTeamInfo } from "./firestoreService";
+import { setTeamInfo } from "./firestoreService";
 import { postMessage } from "./slackService";
 import dayjs = require("dayjs");
 
-if (admin.apps.length === 0) {
-  admin.initializeApp(functions.config().firebase);
-}
+import { getFirestore } from "firebase-admin/firestore";
 
-const firestore = admin.firestore();
-
+const firestore = getFirestore();
 /**
  * 認可コードを用いてアクセストークンを取得する
  * @param {string} code string 認可コード
@@ -39,7 +35,7 @@ export const getGoogleAccessTokenByCode = async (
   );
   const tokenResponse = await oauth2Client.getToken(code as string);
   oauth2Client.setCredentials(tokenResponse.tokens);
-  functions.logger.info(tokenResponse.tokens, { structuredData: true });
+  logger.info(tokenResponse.tokens, { structuredData: true });
 
   const calendarCredentials = tokenResponse.tokens;
 
@@ -56,10 +52,13 @@ export const getExpireAt = (expiresIn: number): Date => {
   return expireAt;
 };
 
-export const createSuddenMeeting = async () => {
+export const createSuddenMeeting = async (channel?: string) => {
   const teamList = await firestore.collection("teams").get();
   await Promise.all(
     teamList.docs.map(async (team) => {
+      if (!!channel && team.id !== channel) {
+        return;
+      }
       const web = new WebClient(SLACK_BOT_TOKEN);
 
       const members = await web.conversations.members({
@@ -69,136 +68,108 @@ export const createSuddenMeeting = async () => {
       if (!members.members) {
         return;
       }
-      const mailUserIdMap: { [key: string]: string } = {};
-      const mailList = await Promise.all(
-        members.members.map(async (member) => {
-          const userInfo = await web.users.info({ user: member });
-          if (userInfo?.user?.profile?.email) {
-            mailUserIdMap[userInfo.user.profile.email] = member;
-            return { id: userInfo?.user?.profile?.email };
-          }
-          return { id: "" };
-        })
-      );
 
-      const credential = await getCalendarCredentials(team.id);
+      const shuffle = (array: string[]) => {
+        const newArray = array.slice();
+        for (let i = newArray.length - 1; i >= 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+        }
+        return newArray;
+      };
 
-      const oauth2Client = new google.auth.OAuth2(
-        CALENDAR_CLIENT_ID,
-        CALENDAR_CLIENT_SECRET,
-        CALENDAR_REDIRECT_URI
-      );
-      oauth2Client.setCredentials(credential);
-      const items = mailList.filter((mail) => !!mail.id);
+      // メンバーの選択回数を取得する関数
+      const getMemberSelectionCounts = async (
+        members: string[]
+      ): Promise<{ [memberId: string]: number }> => {
+        const selectionCounts = team.data()?.selectionCounts || {};
 
-      const result = await google
-        .calendar({ version: "v3", auth: oauth2Client })
-        .freebusy.query({
-          requestBody: {
-            items,
-            timeMax:
-              dayjs()
-                .hour(18)
-                .minute(0)
-                .second(0)
-                .format("YYYY-MM-DDTHH:mm:ss") + "+09:00",
-            timeMin:
-              dayjs()
-                .hour(15)
-                .minute(0)
-                .second(0)
-                .format("YYYY-MM-DDTHH:mm:ss") + "+09:00",
-            timeZone: "Asia/Tokyo",
-          },
+        // メンバーの数が増えた場合の処理
+        const existingMembers = Object.keys(selectionCounts);
+        const newMembers = members.filter(
+          (member) => !existingMembers.includes(member)
+        );
+        if (newMembers.length > 0) {
+          const minNonZeroCount = Math.min(
+            ...existingMembers
+              .map((member) => selectionCounts[member])
+              .filter((count) => count > 0)
+          );
+          newMembers.forEach((member) => {
+            selectionCounts[member] = minNonZeroCount;
+          });
+        }
+
+        // メンバーの数が減った場合の処理
+        const removedMembers = existingMembers.filter(
+          (member) => !members.includes(member)
+        );
+        removedMembers.forEach((member) => {
+          delete selectionCounts[member];
         });
 
-      const changeBit = (dateItem: calendarV3.Schema$TimePeriod) => {
-        // 予定がある時間帯
-        const start = dayjs(dateItem.start);
-        const end = dayjs(dateItem.end);
+        // 初回の場合、members.membersのリストから回数を0に設定して初期値を作成
+        if (Object.keys(selectionCounts).length === 0) {
+          members.forEach((member) => {
+            selectionCounts[member] = 0;
+          });
+        }
 
-        // 空き時間を求めるために対象としたい時間帯(15時以降（UTC6時以降）)
-        const clockInTime = start.clone().hour(6).minute(0);
+        return selectionCounts;
+      };
 
-        // ビット処理するために必要な時間帯
-        const dateBit: boolean[] = [];
+      // メンバーを選択する関数
+      const selectMembers = async (members: string[]): Promise<string[]> => {
+        const selectionCounts = await getMemberSelectionCounts(members);
+        const sortedMembers = members.sort((a, b) => {
+          return (selectionCounts[a] || 0) - (selectionCounts[b] || 0);
+        });
 
-        let checkDuration = clockInTime;
-        for (let i = 0; i < 6; i++) {
-          // 予定がある稼働かを設定
-          dateBit.push(
-            (start.isBefore(checkDuration) || start.isSame(checkDuration)) &&
-              end.isAfter(checkDuration)
+        const selectedMembers: string[] = [];
+        let i = 0;
+        while (selectedMembers.length < 5 && i < sortedMembers.length) {
+          const currentCount = selectionCounts[sortedMembers[i]] || 0;
+          const sameCountMembers = sortedMembers.filter(
+            (member) => (selectionCounts[member] || 0) === currentCount
           );
-          // 次の時間帯へ
-          checkDuration = checkDuration.add(30, "m");
-        }
-        const dateKey = start.toISOString();
-        return { dateKey, dateBit };
-      };
-
-      let resultBit: { email: string; allBit: boolean[] }[] = [];
-      if (result?.data?.calendars) {
-        resultBit = Object.entries(result.data.calendars).map(
-          ([email, events]) => {
-            if (Array.isArray(events.busy)) {
-              const bitArray = events.busy.map(changeBit);
-              const allBit: boolean[] = [];
-              bitArray.forEach((bitData) => {
-                bitData.dateBit.forEach((bit, index) => {
-                  if (index === 0) {
-                    allBit.push(bit);
-                  } else {
-                    allBit[index] = allBit[index] || bit;
-                  }
-                });
-              });
-              return { email, allBit };
-            }
-            return { email, allBit: [] };
+          if (sameCountMembers.length + selectedMembers.length <= 5) {
+            selectedMembers.push(...sameCountMembers);
+            i += sameCountMembers.length;
+          } else {
+            const remainingSlots = 5 - selectedMembers.length;
+            selectedMembers.push(
+              ...shuffle(sameCountMembers).slice(0, remainingSlots)
+            );
+            break;
           }
-        );
-      }
-
-      const targetTime = Math.floor(Math.random() * 6);
-
-      const shuffle = ([...array]) => {
-        for (let i = array.length - 1; i >= 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [array[i], array[j]] = [array[j], array[i]];
         }
-        return array;
+
+        // 選択されたメンバーの回数をインクリメント
+        selectedMembers.forEach((member) => {
+          selectionCounts[member] = (selectionCounts[member] || 0) + 1;
+        });
+
+        // Firestoreに保存
+        await team.ref.update({ selectionCounts });
+
+        return selectedMembers;
       };
 
-      const resultShuffle = shuffle(resultBit);
-      const targetUser: string[] = [];
+      // メンバーを選択する処理を追加
+      const targetUser = await selectMembers(members.members);
+      console.log("Selected Members:", targetUser);
 
-      resultShuffle.forEach((user) => {
-        if (targetUser.length < 4 && !user.allBit[targetTime]) {
-          targetUser.push(user.email);
-        }
-      });
+      team.data().members = team.data().members || { members: [] };
+      members.members.sort(() => Math.random() - 0.5);
 
-      const time = [
-        { hour: 15, minute: 0 },
-        { hour: 15, minute: 30 },
-        { hour: 16, minute: 0 },
-        { hour: 16, minute: 30 },
-        { hour: 17, minute: 0 },
-        { hour: 17, minute: 30 },
-      ];
-
-      const targetDate = dayjs()
-        .hour(time[targetTime].hour)
-        .minute(time[targetTime].minute);
+      // 15時固定
+      const targetDate = dayjs().hour(15).minute(0).second(0).millisecond(0);
 
       postMessage(
         "```\n＿人人人人人人人＿\n＞　突然の会議　＜\n￣Y^Y^Y^Y^Y^Y￣\n```\n" +
           `${targetUser
-            .map((mail) => `<@${mailUserIdMap[mail]}> さん`)
-            .join("、")}\n\n突然ですが本日${targetDate.format(
-            "HH:mm"
-          )}から雑談しませんか！？\n\n` +
+            .map((user) => `<@${user}> さん`)
+            .join("、")}\n\n突然ですが本日15時から雑談しませんか！？\n\n` +
           "時間になったらこのチャンネルのハドルに参加してください！！\n",
         SLACK_TARGET_CHANNEL
       );
@@ -214,10 +185,8 @@ export const createSuddenMeeting = async () => {
         channel: SLACK_TARGET_CHANNEL,
         text:
           `${targetUser
-            .map((mail) => `<@${mailUserIdMap[mail]}> さん`)
-            .join("、")}\n\nもうすぐ雑談の時間（${targetDate.format(
-            "HH:mm"
-          )}）になります！\n\n` +
+            .map((user) => `<@${user}> さん`)
+            .join("、")}\n\nもうすぐ雑談の時間になります！\n\n` +
           "時間になったらこのチャンネルのハドルに参加してください！！\n",
       };
 

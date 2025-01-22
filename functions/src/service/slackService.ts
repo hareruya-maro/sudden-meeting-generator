@@ -89,7 +89,7 @@ export const appMention = async (event: {
 
   if (text.includes("create")) {
     // 会議を作成する
-    await createSuddenMeeting();
+    await createSuddenMeeting(channel);
   } else {
     // Google CalendarとのOAuth連携用URLを返す
     await linkToGoogle(team, channel, ts);

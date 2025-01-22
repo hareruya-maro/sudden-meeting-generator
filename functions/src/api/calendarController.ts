@@ -1,19 +1,16 @@
 /* eslint-disable camelcase */
-import * as functions from "firebase-functions";
+import { logger } from "firebase-functions";
+import { onRequest } from "firebase-functions/v2/https";
 import { REGION } from "../const";
 import { getGoogleAccessTokenByCode } from "../service/calendarService";
 import { clearOAuthInfo, getOAuthInfo } from "../service/firestoreService";
 import { postMessage } from "../service/slackService";
 
-exports.callback = functions
-  .runWith({
-    timeoutSeconds: 60,
-    memory: "256MB",
-  })
-  .region(REGION)
-  .https.onRequest(async (request, response) => {
+exports.callback = onRequest(
+  { region: REGION, timeoutSeconds: 60, memory: "256MiB" },
+  async (request, response) => {
     const { code, state } = request.query;
-    functions.logger.info(request.query, { structuredData: true });
+    logger.info(request.query, { structuredData: true });
 
     // stateが設定されていなければエラー
     if (!state) {
@@ -33,7 +30,7 @@ exports.callback = functions
       response.status(400).send("invalid state");
       return;
     }
-    functions.logger.info(oauthInfo, { structuredData: true });
+    logger.info(oauthInfo, { structuredData: true });
 
     const { teamId, channelId, threadTs } = oauthInfo;
 
@@ -42,7 +39,7 @@ exports.callback = functions
       await getGoogleAccessTokenByCode(code as string, teamId);
       await clearOAuthInfo(state as string);
     } catch (e) {
-      functions.logger.error(e, { structuredData: true });
+      logger.error(e, { structuredData: true });
       throw e;
     }
 
@@ -51,4 +48,5 @@ exports.callback = functions
     response.send(
       "Googleとの連携に成功しました。この画面を閉じ、Slackを開いてください。"
     );
-  });
+  }
+);

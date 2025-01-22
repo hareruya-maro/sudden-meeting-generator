@@ -5,7 +5,7 @@
   "eslint.lintTask.enable": true,
   "eslint.workingDirectories": ["./functions"],
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.eslint": "explicit"
   },
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"

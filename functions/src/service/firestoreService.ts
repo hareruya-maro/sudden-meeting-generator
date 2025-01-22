@@ -1,11 +1,6 @@
-import * as admin from "firebase-admin";
-import * as functions from "firebase-functions";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
-if (admin.apps.length === 0) {
-  admin.initializeApp(functions.config().firebase);
-}
-
-const firestore = admin.firestore();
+const firestore = getFirestore();
 
 export const setTeamInfo = async (teamId: string, info: any) => {
   const teamRef = firestore.collection("teams").doc(teamId);
@@ -48,7 +43,7 @@ export const checkEvent = async (
   } else {
     await eventRef.set({
       ...event,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
     return true;
   }
@@ -70,7 +65,7 @@ export const storeOAuthInfo = async (
     teamId,
     channelId,
     threadTs,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   });
   return oauthDoc.id;
 };
